@@ -1,62 +1,89 @@
 package archiebaldry.nrftw;
 
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.level.storage.loot.entries.LootItem;
+import net.minecraft.world.level.storage.loot.predicates.LootItemKilledByPlayerCondition;
+import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceCondition;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.event.LootTableLoadEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
-// The value here should match an entry in the META-INF/mods.toml file
-@Mod(ExampleMod.MODID)
+@Mod(ExampleMod.MOD_ID)
 public class ExampleMod
 {
-    // Define mod id in a common place for everything to reference
-    public static final String MODID = "nrftw";
-    // Directly reference a slf4j logger
+    public static final String MOD_ID = "nrftw";
+
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public ExampleMod(FMLJavaModLoadingContext context)
+    private static final float PHANTOM_MEMBRANE_CHANCE = 0.25f;
+
+    public ExampleMod()
     {
-        IEventBus modEventBus = context.getModEventBus();
-
-        // Register the commonSetup method for modloading
-        modEventBus.addListener(this::commonSetup);
-
-        // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event)
-    {
-        // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
-    }
-
-    // You can use SubscribeEvent and let the Event Bus discover methods to call
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event)
-    {
-        // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
+    public void onLootTableLoad(LootTableLoadEvent event) {
+        if (event.getName().equals(EntityType.DROWNED.getDefaultLootTable())) {
+            LootPool.Builder poolBuilder = LootPool.lootPool()
+                    .add(LootItem.lootTableItem(Items.PHANTOM_MEMBRANE))
+                    .when(LootItemKilledByPlayerCondition.killedByPlayer())
+                    .when(LootItemRandomChanceCondition.randomChance(PHANTOM_MEMBRANE_CHANCE));
+
+            event.getTable().addPool(poolBuilder.build());
+        }
     }
 
-    // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-    @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
-    public static class ClientModEvents
-    {
-        @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event)
-        {
-            // Some client setup code
-            LOGGER.info("HELLO FROM CLIENT SETUP");
-            LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    @SubscribeEvent
+    public void onBlockRightClick(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+
+        Level world = event.getLevel();
+
+        BlockHitResult hitResult = event.getHitVec();
+
+        if (!world.isClientSide) {
+            BlockPos pos = hitResult.getBlockPos();
+
+            BlockState state = world.getBlockState(pos);
+
+            Block block = state.getBlock();
+
+            if (block instanceof BedBlock) {
+                player.displayClientMessage(Component.literal("There ain't no rest for the wicked"), true);
+
+                LOGGER.info("{} tried to use a bed but there ain't no rest for the wicked.", player.getName().getString());
+
+                event.setCancellationResult(InteractionResult.SUCCESS);
+
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public void onServerStarted(ServerStartedEvent event) {
+        for (ServerLevel world : event.getServer().getAllLevels()) {
+            world.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_DOINSOMNIA).set(false, event.getServer());
+
+            LOGGER.info("Disabled insomnia in {}.", world);
         }
     }
 }
