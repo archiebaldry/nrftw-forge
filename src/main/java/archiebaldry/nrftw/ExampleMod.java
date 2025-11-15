@@ -1,4 +1,4 @@
-package com.example.examplemod;
+package archiebaldry.nrftw;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 public class ExampleMod
 {
     // Define mod id in a common place for everything to reference
-    public static final String MODID = "examplemod";
+    public static final String MODID = "nrftw";
     // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
     // Create a Deferred Register to hold Blocks which will all be registered under the "examplemod" namespace
